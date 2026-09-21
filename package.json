@@ -1,0 +1,53 @@
+{
+  "name": "@dsh-external/dsh-progress-narrator",
+  "version": "0.2.0",
+  "description": "简短自然的工作说明；后台监测与有界提醒，官方视图和 Reader 保留普通字重的文字。",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "scripts",
+    "tests",
+    "README.md"
+  ],
+  "license": "BSD-3-Clause",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-client-connection": "*",
+    "@deepseek-ai/schemastery": "*"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check lib/index.js && node --check lib/state.js && node --check lib/protocol.js && node --check lib/rules.js && node --check lib/client.js && node --check lib/config.js",
+    "build": "node scripts/build-client.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/S-AN-Shu/dsh-progress-narrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/S-AN-Shu/dsh-progress-narrator/issues"
+  },
+  "homepage": "https://github.com/S-AN-Shu/dsh-progress-narrator"
+}
