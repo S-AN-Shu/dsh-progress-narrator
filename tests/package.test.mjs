@@ -18,6 +18,11 @@ test('bundle patch inserts exactly one loader entry named after the package', ()
   assert.match(text, /id:\s*progress-narrator/)
   assert.ok(text.includes(pkg.name), 'entry name must equal the package name')
 })
+test('host plugin id and version track the manifest', async () => {
+  const host = await import('../lib/index.js')
+  assert.equal(host.name, pkg.name)
+  assert.equal(host.VERSION, pkg.version)
+})
 test('manifest is publishable and advertises the discovery topic', () => {
   assert.notEqual(pkg.private, true)
   assert.ok((pkg.keywords ?? []).includes('dsh-plugin'))

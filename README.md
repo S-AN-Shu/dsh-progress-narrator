@@ -58,7 +58,7 @@ dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
 
 ```json
 {
-  "@dsh-external/dsh-progress-narrator": "link:C:/path/to/dsh-progress-narrator"
+  "dsh-progress-narrator": "link:C:/path/to/dsh-progress-narrator"
 }
 ```
 
@@ -67,7 +67,7 @@ dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
 ```yaml
 - insert:
     - id: progress-narrator
-      name: '@dsh-external/dsh-progress-narrator'
+      name: 'dsh-progress-narrator'
       config: {}
 ```
 
@@ -106,7 +106,7 @@ npm pack --dry-run
 
 ## 验证范围
 
-当前版本在本机 DSH 环境中完成 Host/Client 接线、51 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
+当前版本在本机 DSH 环境中完成 Host/Client 接线、52 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
 
 ## 许可
 

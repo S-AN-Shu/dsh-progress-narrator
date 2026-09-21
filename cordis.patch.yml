@@ -3,5 +3,5 @@
 # 若 profile 的 cordis.patch.yml 里已有同 id 的条目，请只保留一处，避免重复加载。
 - insert:
     - id: progress-narrator
-      name: '@dsh-external/dsh-progress-narrator'
+      name: 'dsh-progress-narrator'
       config: {}

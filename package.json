@@ -1,5 +1,5 @@
 {
-  "name": "@dsh-external/dsh-progress-narrator",
+  "name": "dsh-progress-narrator",
   "version": "0.2.2",
   "description": "简短自然的工作说明；后台监测与有界提醒，官方视图和 Reader 保留普通字重的文字。",
   "type": "module",
