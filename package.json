@@ -1,8 +1,7 @@
 {
   "name": "@dsh-external/dsh-progress-narrator",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "简短自然的工作说明；后台监测与有界提醒，官方视图和 Reader 保留普通字重的文字。",
-  "private": true,
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -15,6 +14,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "cordis.patch.yml",
     "lib",
     "src",
     "scripts",
@@ -22,12 +22,22 @@
     "README.md"
   ],
   "license": "BSD-3-Clause",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "progress",
+    "narration",
+    "folding"
+  ],
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
     "@deepseek-ai/dsh-client-connection": "*",
     "@deepseek-ai/schemastery": "*"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "inject": [

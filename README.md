@@ -41,7 +41,20 @@ Reader 的 UI 和折叠由 better-display 自己提供，本插件不重复实�
 
 ## 安装
 
-这是一个 DSH 外部插件源码仓库，当前不发布 npm 包。将仓库克隆到本机后，在 web profile 的 `package.json` 添加本地链接：
+本仓库既是外部插件的源码仓库，也是一个标准的 DSH bundle：根目录的 `cordis.patch.yml` 由 manifest 里的 `dsh.bundle.patch` 声明，所以 `dsh plugin add` 安装后它会作为一层 profile 层生效。npm 包尚未发布，本机有两种安装方式。
+
+**按 bundle 安装（推荐）**
+
+```powershell
+git clone https://github.com/S-AN-Shu/dsh-progress-narrator
+dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
+```
+
+`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。发布到 npm 之后，同一条命令可以直接写包名和精确版本。
+
+**手工挂载（不使用 bundle 层）**
+
+在 profile 的 `package.json` 里加本地链接依赖：
 
 ```json
 {
@@ -58,7 +71,9 @@ Reader 的 UI 和折叠由 better-display 自己提供，本插件不重复实�
       config: {}
 ```
 
-重启 DSH 后，在设置页打开“工作说明”即可调整配置。不要把本仓库加入 profile bundles；它使用依赖和手工 insert 挂载。
+两种方式只选一种：同一个 `id` 同时出现在 bundle 层和 profile 的 `cordis.patch.yml` 里会被挂载两次，DSH 启动时报 `duplicate loader entry id`。
+
+重启 DSH 后，在设置页打开“工作说明”即可调整配置。
 
 ## 开发
 
@@ -72,7 +87,7 @@ npm run build
 npm pack --dry-run
 ```
 
-`npm run build` 只生成客户端；Host 使用纯 ESM JavaScript，不需要额外构建链。提交前应同时检查测试、语法和 `npm pack --dry-run` 内容，不要提交 `node_modules`、备份文件或本机维护记录。
+`npm run build` 只生成客户端；Host 使用纯 ESM JavaScript，不需要额外构建链。提交前应同时检查测试、语法和 `npm pack --dry-run` 内容——产物里必须包含根目录的 `cordis.patch.yml`，它是安装路径依赖的 bundle 层。不要提交 `node_modules`、备份文件或本机维护记录。
 
 ## 默认配置
 
@@ -91,7 +106,7 @@ npm pack --dry-run
 
 ## 验证范围
 
-当前版本在本机 DSH 环境中完成 Host/Client 接线、48 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
+当前版本在本机 DSH 环境中完成 Host/Client 接线、51 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
 
 ## 许可
 

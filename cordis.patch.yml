@@ -1,0 +1,7 @@
+# DSH bundle layer. 声明在 package.json 的 dsh.bundle.patch 上，由
+# `dsh plugin --profile <name> add <package>` 安装时随层生效。
+# 若 profile 的 cordis.patch.yml 里已有同 id 的条目，请只保留一处，避免重复加载。
+- insert:
+    - id: progress-narrator
+      name: '@dsh-external/dsh-progress-narrator'
+      config: {}
