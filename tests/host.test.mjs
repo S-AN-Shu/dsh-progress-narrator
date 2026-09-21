@@ -20,7 +20,7 @@ test('Config rejects invalid object, boolean, fractional counts and unknown fiel
   assert.equal(Config['~standard'].validate(undefined).value.enabled, true)
   assert.equal(Config['~standard'].validate(undefined).value.showStatusPanel, false)
   assert.equal(Config['~standard'].validate({ showStatusPanel: true }).value.showStatusPanel, true)
-  for (const value of [null, [], 1, { enabled: 'false' }, { showStatusPanel: 'false' }, { showStatusPanel: null }, { silentStepThreshold: 1.5 }, { marker: 'x' }, { uiTickMs: null }]) assert.ok(Config['~standard'].validate(value).issues)
+  for (const value of [null, [], 1, { enabled: 'false' }, { firstNarration: 'true' }, { showStatusPanel: 'false' }, { showStatusPanel: null }, { silentStepThreshold: 1.5 }, { marker: 'x' }, { uiTickMs: null }]) assert.ok(Config['~standard'].validate(value).issues)
   assert.throws(() => apply({}, { enabled: 'yes' }), /boolean/)
 })
 test('teach at first legitimate boundary, source version and decision fields preserved', async () => {

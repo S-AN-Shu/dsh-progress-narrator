@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createNarrationEngine } from '../lib/state.js'
 function fixture(config = {}) {
   let clock = 1000, seq = 0
-  const engine = createNarrationEngine({ config, now: () => clock })
+  const engine = createNarrationEngine({ config: { firstNarration: false, ...config }, now: () => clock })
   const event = (type, data = {}, extra = {}) => engine.observeEvent('s', { type, data, seq: seq++, time: clock, ...extra })
   const next = extra => engine.beginPreStep('s', { turn: 1, rulesPresent: true, ...extra })
   const message = (step, text = '', extra = {}) => event('assistant/message', { turn: 1, step, message: { id: `m${step}`, content: [{ type: 'text', text }] }, ...extra })
@@ -25,6 +25,14 @@ test('turn counters and explanation anchor never leak into the next turn', () =>
 test('teach is available on first request and merges with an overdue nudge', () => {
   const f = fixture(); f.advance(125000)
   assert.deepEqual(f.next({ rulesPresent: false }), { teach: true, nudge: false })
+})
+test('first silent assistant step gets one immediate narration reminder', () => {
+  const f = fixture({ firstNarration: true }); f.message(1)
+  assert.deepEqual(f.next(), { teach: false, nudge: true })
+  f.engine.reserveInjection('s', 'first', 'nudge')
+  f.event('user/message', { id: 'first', source: { kind: 'progress-narrator' } })
+  f.message(2)
+  assert.deepEqual(f.next(), { teach: false, nudge: false })
 })
 test('only accepted control messages consume nudge budget; own control is not activity', () => {
   const f = fixture(); f.message(1); f.message(2); f.advance(125000)
