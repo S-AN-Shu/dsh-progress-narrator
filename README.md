@@ -17,9 +17,17 @@
 
 ## 与 better-display 的关系
 
-本仓库是进度播报插件本体。better-display 的 Reader 组件、Reader bundle 和视觉样式属于独立插件项目；本插件只负责检测 Reader 是否接管折叠并让出基础折叠。两个项目共用同一份进度行协议时，应保持 `lib/protocol.js` 与 Reader 侧的协议副本一致。
+better-display 是另一个独立项目（上游仓库 [aa2246740/dsh-better-display](https://github.com/aa2246740/dsh-better-display)，以 npm 包 `dsh-better-display` 发布，MIT），不是本仓库的一部分，也不由本插件发布。它的 Reader 组件、Reader bundle 和视觉样式由该项目自行开发、发布和升级；本插件对它的适配是单向的，不复制 Reader 源码，也不改动 Reader 的实现。
 
-这仍然是自动兼容：只安装本插件时，它提供官方对话视图的基础折叠；同时安装并加载 better-display 时，它检测 Reader 的标记并自动停止自己的折叠控制，让 Reader 独占过程折叠和播报行展示。用户不需要手动选择适配器，也不需要把 Reader 源码复制进本仓库。两个插件分开发布，是为了避免重复挂载同一套 UI、让 better-display 可以独立升级；兼容协议和运行时检测就是两者之间的适配层。
+兼容是自动的，用户不需要选择适配器：
+
+- 只安装本插件：在官方对话视图中提供基础折叠与播报行展示。
+- 同时安装并加载 better-display：本插件检测 Reader 挂载后写入的 DOM 标记（`[data-dsh-better-display]`、`[data-reader-flow]`、`[data-reader-turn]`），一旦发现就立即停止自己的折叠控制，让 Reader 独占过程折叠和播报行展示，避免两个插件同时操作同一段 DOM。
+- 检测在运行时进行，不依赖安装顺序、配置开关或手动切换；用户不需要手动选择适配器，也不需要把 Reader 源码复制进本仓库。
+
+Reader 的 UI 和折叠由 better-display 自己提供，本插件不重复实现同一套界面，因此不会重复挂载；better-display 也可以按自己的节奏升级，不必等本插件同步发版。两者之间的适配层，就是公开的进度行协议（本插件的 `lib/protocol.js`）加上这一组运行时标记。
+
+需要 Reader 侧配合的改动属于 better-display 项目：应在上游仓库（或你的 fork）中完成，本仓库只保留检测逻辑和兼容说明。本插件作者对 Reader 的适配改动在自己的 fork（[`S-AN-Shu/dsh-better-display`](https://github.com/S-AN-Shu/dsh-better-display)）中维护，与本仓库相互独立、各自发布。
 
 ## 进度行协议
 
@@ -83,7 +91,7 @@ npm pack --dry-run
 
 ## 验证范围
 
-当前版本在本机 DSH 环境中完成 Host/Client 接线、47 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
+当前版本在本机 DSH 环境中完成 Host/Client 接线、48 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
 
 ## 许可
 
