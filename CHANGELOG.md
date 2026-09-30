@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-09-30
+
+- 适配 DSH 0.2 的 scoped Cordis / Schemastery、公开 `session/event` 与 `agent/pre-step` 接口；兼容范围为 `>=0.2.0-rc.1 <0.3.0`，已验证内核为 `0.2.0-rc.2`。
+- 设置使用当前 volatileRef 和 SettingsForms revision 接口；保留严格业务校验、认证 Connection 路由与冲突保护。
+- 客户端依赖改为当前 `dsh-client-ui-chat` / `dsh-client-ui-renderer`；保留原生聊天插槽、进度协议、基础折叠与 Reader 所有权检测。
+- 调整配置测试以验证动态引用、默认/reset 语义及严格业务边界。52 项原有测试全部通过，另通过 4 项当前内核隔离契约验证；真实浏览器、profile 持久化及模型执行需由部署环境单独验收。
+- 保留公共包名 `dsh-progress-narrator` 和 bundle 条目 `progress-narrator`，发布包包含 BSD-3-Clause 许可，不包含本机验证记录。
+
 ## 0.2.2 — 2026-09-21
 
 - 声明 `dsh.bundle.patch` 并在仓库根目录提供 `cordis.patch.yml`，使本插件可以作为标准 DSH bundle 安装（`dsh plugin add` 与目录市场分发都要求这一形态）。

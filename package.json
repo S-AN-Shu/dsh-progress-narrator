@@ -1,7 +1,7 @@
 {
   "name": "dsh-progress-narrator",
-  "version": "0.2.2",
-  "description": "简短自然的工作说明；后台监测与有界提醒，官方视图和 Reader 保留普通字重的文字。",
+  "version": "0.3.0",
+  "description": "Quiet progress narration for DeepSeek Harness 0.2, with native persistent settings and independent Reader compatibility.",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -19,7 +19,9 @@
     "src",
     "scripts",
     "tests",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "license": "BSD-3-Clause",
   "keywords": [
@@ -30,9 +32,9 @@
     "folding"
   ],
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-client-connection": "*",
-    "@deepseek-ai/schemastery": "*"
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0"
   },
   "dsh": {
     "bundle": {
@@ -42,9 +44,11 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-ui-chat",
-        "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-renderer"
       ]
+    },
+    "compatibility": {
+      "host": ">=0.2.0-rc.1 <0.3.0"
     }
   },
   "scripts": {
@@ -59,5 +63,16 @@
   "bugs": {
     "url": "https://github.com/S-AN-Shu/dsh-progress-narrator/issues"
   },
-  "homepage": "https://github.com/S-AN-Shu/dsh-progress-narrator"
+  "homepage": "https://github.com/S-AN-Shu/dsh-progress-narrator",
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-connection": {
+      "optional": true
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { apply, Config } from '../lib/index.js'
+import { assertConfig, validateConfig } from '../lib/config.js'
 function fixture(config = {}) {
   const handlers = new Map(), routes = new Map(), disposers = [], history = []
   const ctx = {
@@ -16,11 +17,26 @@ function fixture(config = {}) {
   const step = (args = {}, decision = { kind: 'enter', messages: [{ id: 'human', role: 'user', content: [] }] }) => handlers.get('agent/pre-step')({ agent, turn: 1, step: 1, messages: [], signal: controller.signal, ...args }, async () => decision)
   return { handlers, routes, disposers, history, session, agent, controller, event, step }
 }
-test('Config rejects invalid object, boolean, fractional counts and unknown fields', () => {
-  assert.equal(Config['~standard'].validate(undefined).value.enabled, true)
-  assert.equal(Config['~standard'].validate(undefined).value.showStatusPanel, false)
-  assert.equal(Config['~standard'].validate({ showStatusPanel: true }).value.showStatusPanel, true)
-  for (const value of [null, [], 1, { enabled: 'false' }, { firstNarration: 'true' }, { showStatusPanel: 'false' }, { showStatusPanel: null }, { silentStepThreshold: 1.5 }, { marker: 'x' }, { uiTickMs: null }]) assert.ok(Config['~standard'].validate(value).issues)
+test('current volatile Config preserves defaults and business validation rejects malformed and unknown fields', () => {
+  const defaults = Config['~standard'].validate(undefined).value
+  assert.equal(typeof defaults.get, 'function')
+  assert.equal(defaults.get().enabled, true)
+  assert.equal(defaults.get().showStatusPanel, false)
+  assert.equal(Config['~standard'].validate({ showStatusPanel: true }).value.get().showStatusPanel, true)
+  for (const value of [null, [], 1, { enabled: 'false' }, { firstNarration: 'true' }, { showStatusPanel: 'false' }, { showStatusPanel: null }, { silentStepThreshold: 1.5 }, { uiTickMs: null }]) {
+    if (value !== null && value?.showStatusPanel !== null && value?.uiTickMs !== null) assert.ok(Config['~standard'].validate(value).issues)
+    assert.ok(validateConfig(value).issues)
+    assert.throws(() => assertConfig(value), TypeError)
+  }
+  // Null is a default/reset value in the current form schema, but is invalid raw business input.
+  assert.deepEqual(Config['~standard'].validate(null).value.get(), defaults.get())
+  assert.equal(Config['~standard'].validate({ showStatusPanel: null }).value.get().showStatusPanel, false)
+  assert.equal(Config['~standard'].validate({ uiTickMs: null }).value.get().uiTickMs, 1000)
+  // Schemastery preserves extra fields; the plugin's strict business boundary rejects them.
+  const extra = Config['~standard'].validate({ marker: 'x' }).value.get()
+  assert.equal(extra.marker, 'x')
+  assert.ok(validateConfig(extra).issues)
+  assert.throws(() => assertConfig(extra), /unknown/)
   assert.throws(() => apply({}, { enabled: 'yes' }), /boolean/)
 })
 test('teach at first legitimate boundary, source version and decision fields preserved', async () => {

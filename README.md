@@ -1,6 +1,8 @@
 # dsh-progress-narrator
 
-一个适用于 DeepSeek Harness（DSH）的 Host + Web Client 插件，用简短、安静的工作说明让长任务保持可理解。它不会显示深度思维链，也不会控制工具执行。
+一个适用于 DeepSeek Harness（DSH）0.2 的 Host + Web Client 插件，用简短、安静的工作说明让长任务保持可理解。它不会显示深度思维链，也不会控制工具执行。
+
+0.3.0 使用当前 DSH 的公开会话事件、动态配置引用和原生聊天插槽；兼容范围声明为 `>=0.2.0-rc.1 <0.3.0`，已验证的内核版本为 `0.2.0-rc.2`。插件旧版 0.2.2 的接线属于旧内核实现，不能用它的历史验收代替当前兼容验证。包名仍为 `dsh-progress-narrator`，bundle 条目仍为 `progress-narrator`。
 
 ## 做什么
 
@@ -41,7 +43,7 @@ Reader 的 UI 和折叠由 better-display 自己提供，本插件不重复实�
 
 ## 安装
 
-本仓库既是外部插件的源码仓库，也是一个标准的 DSH bundle：根目录的 `cordis.patch.yml` 由 manifest 里的 `dsh.bundle.patch` 声明，所以 `dsh plugin add` 安装后它会作为一层 profile 层生效。npm 包尚未发布，本机有两种安装方式。
+本仓库既是外部插件的源码仓库，也是一个标准的 DSH bundle：根目录的 `cordis.patch.yml` 由 manifest 里的 `dsh.bundle.patch` 声明，所以 `dsh plugin add` 安装后它会作为一层 profile 层生效。可使用发布的精确版本、提供的 `.tgz` 文件，或本地源码目录；不要把不同版本同时挂载在同一 profile。
 
 **按 bundle 安装（推荐）**
 
@@ -50,7 +52,13 @@ git clone https://github.com/S-AN-Shu/dsh-progress-narrator
 dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
 ```
 
-`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。发布到 npm 之后，同一条命令可以直接写包名和精确版本。
+若使用提供的 0.3.0 发布包：
+
+```powershell
+dsh plugin --profile web add "file:C:/path/to/dsh-progress-narrator-0.3.0.tgz"
+```
+
+`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。npm 发布可用时，同一条命令也可以写包名和精确版本。
 
 **手工挂载（不使用 bundle 层）**
 
@@ -77,7 +85,7 @@ dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
 
 ## 开发
 
-要求 Node.js 22+ 和一个可运行的 DSH profile。`lib/` 中的客户端和 Host 文件是运行产物；修改客户端时编辑 `src/client.js`，再生成 `lib/client.js`。
+要求 Node.js 22+ 和一个可运行的 DSH 0.2 profile。测试中的 scoped Cordis / Schemastery 必须来自当前宿主依赖，不能用旧的非 scoped 包替代。`lib/` 中的客户端和 Host 文件是运行产物；修改客户端时编辑 `src/client.js`，再生成 `lib/client.js`。
 
 ```powershell
 npm install
@@ -106,7 +114,9 @@ npm pack --dry-run
 
 ## 验证范围
 
-当前版本在本机 DSH 环境中完成 Host/Client 接线、52 项插件单测、客户端语法检查、构建和浏览器隔离验收。Reader 的 144 项测试、动画回归和实际历史会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。
+0.3.0 候选在 DSH `0.2.0-rc.2` 的实际依赖上通过 52 项插件测试，以及构建、语法和发布包检查。额外的 4 项隔离契约验证使用当前 Cordis、Session v4、SettingsForms、SlotCore 和官方聊天图投影，覆盖请求接纳、配置 revision 冲突、动态引用更新、原生折叠后的工作说明保留及卸载清理。设置持久化适配器和 React 渲染在这些隔离验证中替换为测试夹具；它们不等同于真实浏览器交互、profile 文件写入或模型执行验收。
+
+Reader 的测试与实际会话折叠验收属于 better-display 项目，不是本仓库测试套件的一部分。DOM 标记决定折叠所有权；第三方插件将来若更改标记，需要重新验证。
 
 ## 许可
 
