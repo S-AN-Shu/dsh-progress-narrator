@@ -19,17 +19,24 @@
 
 ## 与 better-display 的关系
 
-better-display 是另一个独立项目（上游仓库 [aa2246740/dsh-better-display](https://github.com/aa2246740/dsh-better-display)，以 npm 包 `dsh-better-display` 发布，MIT），不是本仓库的一部分，也不由本插件发布。它的 Reader 组件、Reader bundle 和视觉样式由该项目自行开发、发布和升级；本插件对它的适配是单向的，不复制 Reader 源码，也不改动 Reader 的实现。
+better-display 是独立项目（上游 [aa2246740/dsh-better-display](https://github.com/aa2246740/dsh-better-display)，npm 包 `dsh-better-display`，MIT）。它的 Reader、样式和版本由上游维护。本仓库不发布 better-display，也不提供它的适配版安装包。
 
-兼容是自动的，用户不需要选择适配器：
+本插件在官方“对话”页提供基础折叠和播报行展示。检测到 Reader 的 DOM 标记（`[data-dsh-better-display]`、`[data-reader-flow]`、`[data-reader-turn]`）后，会停止自己的折叠控制，让 Reader 管理过程区域。这个自动检测只解决折叠控制权，不代表 Reader 已支持播报协议。
 
-- 只安装本插件：在官方对话视图中提供基础折叠与播报行展示。
-- 同时安装并加载 better-display：本插件检测 Reader 挂载后写入的 DOM 标记（`[data-dsh-better-display]`、`[data-reader-flow]`、`[data-reader-turn]`），一旦发现就立即停止自己的折叠控制，让 Reader 独占过程折叠和播报行展示，避免两个插件同时操作同一段 DOM。
-- 检测在运行时进行，不依赖安装顺序、配置开关或手动切换；用户不需要手动选择适配器，也不需要把 Reader 源码复制进本仓库。
+### 安装 better-display 后，播报被折叠或出现图钉怎么办？
 
-Reader 的 UI 和折叠由 better-display 自己提供，本插件不重复实现同一套界面，因此不会重复挂载；better-display 也可以按自己的节奏升级，不必等本插件同步发版。两者之间的适配层，就是公开的进度行协议（本插件的 `lib/protocol.js`）加上这一组运行时标记。
+1. 切回 DSH 的官方“对话”页。播报会使用普通字重、淡灰白色展示，并隐藏识别前缀；不需要修改 better-display。
+2. 如果继续使用“阅读”页，未适配的 Reader 可能把中间播报当作过程内容折叠，并原样显示 `📌 进度：`。关闭 Reader 的自动折叠可以查看过程中的播报，但不能消除前缀。
+3. 如需在 Reader 中始终保留安静的播报，需要在你自己的 Reader 源码副本中做展示层修改。下面是基于 better-display 0.3.4 的修改位置；其他版本需重新核对接口。修改前备份已安装包和 profile，完成构建与本地安装后再验证。上游更新可能覆盖本地改动。
 
-需要 Reader 侧配合的改动属于 better-display 项目：应在上游仓库（或你的 fork）中完成，本仓库只保留检测逻辑和兼容说明。本插件作者对 Reader 的适配改动在自己的 fork（[`S-AN-Shu/dsh-better-display`](https://github.com/S-AN-Shu/dsh-better-display)）中维护，与本仓库相互独立、各自发布。
+Reader 侧修改应限于以下位置：
+
+- 在 `src/client/narration.tsx` 解析可见 `assistant-step` 的顶层播报行，解析规则与本插件的 `lib/protocol.js` 一致。用户输入、代码、引用和列表中的示例不能当作播报。
+- 在 `src/client/Reader.tsx` 的每个 `TurnGroup` 中，把播报行放在 `ChoreographedFlow` 外部，这样过程折叠后它仍可见。使用普通字重、主题次级文字色、透明背景，不添加图标或卡片。
+- 在 `src/client/Blocks.tsx` 只对助手正文的渲染副本过滤已经展示的播报，避免重复和前缀泄露。保留图片、工具块与其余文字；不要修改原始会话记录。
+- 构建该源码副本的客户端产物后，按 DSH 的本地 bundle 安装流程使用它。不要只改源码而继续加载旧的 `lib/client.js`；也不要同时挂载两个 Reader bundle。
+
+验收时应检查：过程展开/折叠各显示一次播报、前缀不外露、最终正文和附件仍可见、用户及代码示例不被过滤、原始会话文件不变。这些改动属于 Reader 的本地维护，不需要修改 DSH 内核或压缩配置。本仓库不把这类第三方改动混入 npm 播报包。
 
 ## 进度行协议
 
@@ -58,7 +65,7 @@ dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
 dsh plugin --profile web add "file:C:/path/to/dsh-progress-narrator-0.3.0.tgz"
 ```
 
-`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。npm 发布可用时，同一条命令也可以写包名和精确版本。
+`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。0.3.0 已发布到 npm，也可使用 `dsh plugin --profile web add "dsh-progress-narrator@0.3.0"`；桌面环境应替换为实际使用的 profile 名称。
 
 **手工挂载（不使用 bundle 层）**
 
