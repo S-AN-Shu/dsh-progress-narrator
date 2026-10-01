@@ -65,7 +65,7 @@ dsh plugin --profile web add "link:C:/path/to/dsh-progress-narrator"
 dsh plugin --profile web add "file:C:/path/to/dsh-progress-narrator-0.3.0.tgz"
 ```
 
-`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。0.3.0 已发布到 npm，也可使用 `dsh plugin --profile web add "dsh-progress-narrator@0.3.0"`；桌面环境应替换为实际使用的 profile 名称。
+`dsh plugin add` 转发给 pnpm 安装，然后按已安装状态对账 `dsh.profile.bundles`：声明了 `dsh.bundle` 的依赖会加入 profile `package.json` 的 bundles 列表，它自带的 `cordis.patch.yml` 随层生效。0.3.0 已发布到 npm，Web CLI 可使用 `dsh plugin --profile web add "dsh-progress-narrator@0.3.0"`。桌面应用请在“插件 → 添加插件”中输入 `dsh-progress-narrator@0.3.0`，由桌面插件管理器安装；上面的 Web CLI 命令不会安装到桌面应用。
 
 **手工挂载（不使用 bundle 层）**
 
