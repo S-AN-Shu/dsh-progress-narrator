@@ -1,6 +1,7 @@
 import { installToolFolding } from './tool-fold.js'
 import { foldingPlan, readerOwnsFolding } from './folding.js'
 import { createSettingsUI } from './settings-ui.js'
+import { retainPublicRow } from './public-visibility.js'
 /** Client source; scripts/build-client.mjs embeds the shared protocol verbatim. */
 export function createClient(React, protocol, runtime = window) {
   const h = React.createElement, API = '/api/progress-narrator/state'
@@ -122,7 +123,7 @@ export function createClient(React, protocol, runtime = window) {
     current.current = { cfg, chat }
     React.useEffect(() => {
       controller.current = installToolFolding(runtime.document, anchor.current, () => planFor(current.current.chat).tools,
-        () => current.current.cfg.autoFoldHistory && toolRendererAvailable() && !readerOwnsFoldingNow())
+        () => current.current.cfg.enabled && current.current.cfg.autoFoldHistory && toolRendererAvailable() && !readerOwnsFoldingNow())
       return () => { controller.current?.dispose(); controller.current = null }
     }, [props.sessionId])
     React.useEffect(() => { controller.current?.refresh() }, [chat, cfg])
@@ -148,9 +149,8 @@ export function createClient(React, protocol, runtime = window) {
   function AssistantContent({ Native, props, blocks }) {
     const cfg = React.useSyncExternalStore(subscribe, readSettings, readSettings)
     const chat = props.useChat ? props.useChat(s => s) : EMPTY_CHAT
-    // Reader and this official chat slot can coexist during a view switch. If
-    // Reader is present, let it be the sole owner of process folding.
-    if (readerOwnsFoldingNow() || !cfg.autoFoldHistory || props.turnProcess?.foldable) return h(Native, { ...props, node: { ...props.node, data: { ...props.node.data, blocks } } })
+    // The outer wrapper checks ownership of this row, not another view's root.
+    if (!cfg.autoFoldHistory || props.turnProcess?.foldable) return h(Native, { ...props, node: { ...props.node, data: { ...props.node.data, blocks } } })
     const folded = planFor(chat).reasoning.has(props.node.key)
     // Keep body/final answer intact. Only reasoning groups get a disclosure.
     const groups = []
@@ -167,24 +167,36 @@ export function createClient(React, protocol, runtime = window) {
   function wrapAssistant(Native) {
     return function ProgressAssistant(props) {
       const cfg = React.useSyncExternalStore(subscribe, readSettings, readSettings)
-      if (!cfg.enabled) return h(AssistantContent, { Native, props, blocks: props.node.data.blocks ?? [] })
-      const node = props.node, data = node.data, parts = protocol.progressSegments(data.blocks ?? [])
-      const items = parts.filter(p => p.kind === 'progress').map(p => ({ key: `${node.key ?? data.step}:${p.start}:${p.offset}`, text: p.progressText, interrupted: data.status === 'interrupted' }))
-      const process = props.turnProcess, spec = process?.spec
-      if (process?.foldable && !process.open && data.step === spec?.answerStep) {
-        const turn = node.location?.kind === 'step' || node.location?.kind === 'turn' ? node.location.turn : null
-        for (const step of [...(turn?.steps ?? [])].reverse()) {
-          const prior = step.data.get('assistant-step'), seq = prior?.finalNode?.seq
-          if (seq == null || seq < spec.processStartSeq || seq >= spec.answerAnchorSeq) continue
-          const earlier = protocol.progressSegments(prior.blocks).filter(p => p.kind === 'progress').map(p => ({ key: `${data.turn}:${prior.step}:${p.start}:${p.offset}`, text: p.progressText, interrupted: prior.status === 'interrupted' }))
-          items.unshift(...earlier)
-        }
-      }
-      // The projection is immutable. Only this render receives text with the
-      // separately displayed progress spans removed; tools and source metadata stay.
-      if (!items.length) return h(AssistantContent, { Native, props, blocks: data.blocks ?? [] })
-      const blocks = protocol.withoutProgress(data.blocks)
-      return h(React.Fragment, null, h(ProgressList, { items }), h(AssistantContent, { Native, props, blocks }))
+      const node = props.node, data = node.data, anchor = React.useRef(null)
+      const parts = protocol.publicTextSegments(data.blocks ?? []).filter(p => p.renderable
+        && (props.groupPart !== 'reasoning' || p.kind === 'reasoning')
+        && (props.groupPart !== 'response' || p.kind !== 'reasoning'))
+      const publicHere = parts.some(p => p.public)
+      // A departing Reader still exists during React's render phase. Inspect
+      // this mounted row after commit so view switching cannot freeze delegation.
+      const [reader, setReader] = React.useState(false)
+      React.useLayoutEffect(() => {
+        const owned = !!anchor.current?.closest('[data-dsh-better-display], [data-reader-flow], [data-reader-turn]')
+        if (owned !== reader) setReader(owned)
+      })
+      React.useLayoutEffect(() => {
+        if (!cfg.enabled || reader || !publicHere) return
+        return retainPublicRow(anchor.current, node.key, runtime.document)
+      }, [cfg.enabled, reader, publicHere, node.key])
+      if (!cfg.enabled) return h(Native, props)
+      if (reader) return h('div', {ref:anchor}, h(Native, props))
+      const turn = node.location?.turn, closing = turn?.data?.get('turn-tail')?.closing
+      const final = closing?.finalNode?.seq != null && closing.finalNode.seq === data.finalNode?.seq
+      return h('div', {ref:anchor,'data-pn-source-row':node.key}, parts.map(part => {
+        const key = `${node.key}:${part.start}:${part.offset}`
+        if (part.kind === 'progress') return h('div',{key,className:'dsh-pn-progress','data-pn-progress':key},part.progressText)
+        // A public row can also contain reasoning. Preserve the native reasoning
+        // disclosure when the outer Turn row is exempt from hiding.
+        const process = part.kind === 'reasoning' && publicHere && props.turnProcess?.foldable
+          ? {...props.turnProcess,spec:{...props.turnProcess.spec,answerStep:data.step,inlineReasoning:true}} : props.turnProcess
+        const content = h(AssistantContent,{Native,props:{...props,turnProcess:process},blocks:part.blocks})
+        return h('div',{key,className:part.kind === 'body' && !final ? 'dsh-pn-work' : undefined,'data-pn-public-text':part.public || undefined},content)
+      }))
     }
   }
   function wrapContext(Native) {
@@ -205,7 +217,7 @@ export function createClient(React, protocol, runtime = window) {
         const entry = matching[0]
         return matching.length === 1 && !!entry && (!entry.registrant || entry.registrant.includes('dsh-client-ui-tool'))
       }
-      ctx.effect(() => { const style = runtime.document.createElement('style'); style.textContent = CSS + SETTINGS_CSS; runtime.document.head.appendChild(style); return () => style.remove() })
+      ctx.effect(() => { const style = runtime.document.createElement('style'); style.textContent = CSS + SETTINGS_CSS + ".dsh-pn-work :where(p):not(table p, pre p){font-weight:600}"; runtime.document.head.appendChild(style); return () => style.remove() })
       ctx.slots.inject('conversation.input.dock', function* () {
         yield ctx.slots.register({ name: 'conversation.input.dock', id: 'progress-narrator-status', order: 30 }, StatusDock)
       })
@@ -237,7 +249,7 @@ export function createClient(React, protocol, runtime = window) {
         try { reconcile() } catch (error) { unsubscribe(); throw error }
         return () => { stopped = true; unsubscribe(); dispose?.() }
       })
-      ctx.effect(() => () => { listeners.clear(); runtime.document.documentElement.style.removeProperty('--dsh-progress-font-size'); runtime.document.documentElement.removeAttribute('data-dsh-progress-enabled') })
+      ctx.effect(() => () => { settings = {...settings,enabled:false}; listeners.forEach(fn => fn()); listeners.clear(); runtime.document.documentElement.style.removeProperty('--dsh-progress-font-size'); runtime.document.documentElement.removeAttribute('data-dsh-progress-enabled') })
     },
     // Pure/React surfaces used by isolated acceptance, not a second implementation.
     StatusDock, ProgressList, wrapAssistant, wrapContext, ToolFoldController, BasicFold, SettingsSection, SettingsAction, installToolFolding, narrations, updateSettings,
