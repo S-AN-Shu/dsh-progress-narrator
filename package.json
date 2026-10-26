@@ -1,6 +1,6 @@
 {
   "name": "dsh-progress-narrator",
-  "version": "0.4.0",
+  "version": "0.4.3",
   "description": "Quiet progress narration for DeepSeek Harness 0.2, with native persistent settings and independent Reader compatibility.",
   "type": "module",
   "main": "./lib/index.js",

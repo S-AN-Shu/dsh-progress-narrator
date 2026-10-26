@@ -6,6 +6,7 @@ import { retainPublicRow } from './public-visibility.js'
 export function createClient(React, protocol, runtime = window) {
   const h = React.createElement, API = '/api/progress-narrator/state'
   let toolRendererAvailable = () => true
+  let nativeFoldingAvailable = () => false
   const EMPTY_CHAT = { order: [], nodes: new Map() }
   // better-display owns the Reader's process rows and their fold choreography.
   // The narrator still supplies the shared protocol, but it must not mount a
@@ -123,7 +124,7 @@ export function createClient(React, protocol, runtime = window) {
     current.current = { cfg, chat }
     React.useEffect(() => {
       controller.current = installToolFolding(runtime.document, anchor.current, () => planFor(current.current.chat).tools,
-        () => current.current.cfg.enabled && current.current.cfg.autoFoldHistory && toolRendererAvailable() && !readerOwnsFoldingNow())
+        () => current.current.cfg.enabled && current.current.cfg.autoFoldHistory && toolRendererAvailable() && !nativeFoldingAvailable() && !readerOwnsFoldingNow())
       return () => { controller.current?.dispose(); controller.current = null }
     }, [props.sessionId])
     React.useEffect(() => { controller.current?.refresh() }, [chat, cfg])
@@ -149,8 +150,11 @@ export function createClient(React, protocol, runtime = window) {
   function AssistantContent({ Native, props, blocks }) {
     const cfg = React.useSyncExternalStore(subscribe, readSettings, readSettings)
     const chat = props.useChat ? props.useChat(s => s) : EMPTY_CHAT
-    // The outer wrapper checks ownership of this row, not another view's root.
-    if (!cfg.autoFoldHistory || props.turnProcess?.foldable) return h(Native, { ...props, node: { ...props.node, data: { ...props.node.data, blocks } } })
+    // Native presentation owns both folding and the explicit verbose choice.
+    // A currently non-foldable Turn is still native-owned; fallback is only
+    // for older renderers without either part of the native folding contract.
+    const nativeFolding = typeof props.usePresentation === 'function' || props.turnProcess !== undefined
+    if (!cfg.autoFoldHistory || nativeFolding) return h(Native, { ...props, node: { ...props.node, data: { ...props.node.data, blocks } } })
     const folded = planFor(chat).reasoning.has(props.node.key)
     // Keep body/final answer intact. Only reasoning groups get a disclosure.
     const groups = []
@@ -211,8 +215,12 @@ export function createClient(React, protocol, runtime = window) {
   return {
     name: 'progress-narrator-client', inject: ['slots'],
     apply(ctx) {
+      const nodeEntries = () => typeof ctx.slots.entries === 'function' ? ctx.slots.entries('conversation.chat.node') : (ctx.slots.entriesOfSlot?.('conversation.chat.node') ?? [])
+      // The native controller owns ungrouped historical rows too. Its slot
+      // proves capability even when the selected mode has no foldable members.
+      nativeFoldingAvailable = () => nodeEntries().some(e => e.options.key === 'turn-process')
       toolRendererAvailable = () => {
-        const entries = typeof ctx.slots.entries === 'function' ? ctx.slots.entries('conversation.chat.node') : (ctx.slots.entriesOfSlot?.('conversation.chat.node') ?? [])
+        const entries = nodeEntries()
         const matching = entries.filter(e => e.options.key === 'tool-call')
         const entry = matching[0]
         return matching.length === 1 && !!entry && (!entry.registrant || entry.registrant.includes('dsh-client-ui-tool'))
@@ -227,7 +235,48 @@ export function createClient(React, protocol, runtime = window) {
         // Declaration readiness does not imply that its native entry exists yet.
         // Observe the raw ledger so our own shadow never hides its dependency.
         const slot = 'conversation.chat.node'
-        let current, base, wrapped, dispose, stopped = false
+        const reasoningBody = 'conversation.chat.reasoning.body'
+        const imagesBody = 'conversation.chat.message.images'
+        // Alpha Chat owns this child declaration. Its default Body is exactly
+        // the public Content Factory adapter; redeclaring the child would throw
+        // and borrowing its private renderSlot would violate slot ownership.
+        const defaultReasoningBody = native => {
+          if (key !== 'assistant-step' || !native?.children) return undefined
+          const children = Object.entries(native.children)
+          // DSH 0.2.1 declares a second single/session child ('conversation.chat.message.images')
+          // beside the reasoning body. Accept any all-single/session child set whose
+          // members the shim below renders; an unknown child returns undefined so the
+          // row degrades to the native renderer instead of throwing at render time.
+          if (!children.length || children.some(([, spec]) => spec?.kind !== 'single' || spec?.scope !== 'session')) return undefined
+          if (!children.some(([name]) => name === reasoningBody)) return undefined
+          if (children.some(([name]) => name !== reasoningBody && name !== imagesBody)) return undefined
+          const entries = typeof ctx.slots.entriesOfSlot === 'function' ? ctx.slots.entriesOfSlot(reasoningBody) : (ctx.slots.entries?.(reasoningBody) ?? []).slice().sort((a, b) => (a.options.priority ?? 0) - (b.options.priority ?? 0))
+          const body = entries[0]
+          if (!body || body.options.priority !== 100 || body.children || body.inject || body.store || body.locale) return undefined
+          // The registrant is the owning client module. 0.2.1 ships a minified
+          // runtime, so its value is an opaque id ('Gb') instead of the package
+          // name the old check matched on. Ownership is still proven by the Body
+          // occupant being the unmodified default (priority 100, no locale,
+          // inject, store or children) AND belonging to the SAME registrant that
+          // owns the native node entry.
+          if (!body.registrant || body.registrant !== native.registrant) return undefined
+          return body
+        }
+        const withReasoningFactory = Native => function NativeReasoningFactory(props) {
+          const renderSlot = (name, owner) => {
+            if (name === reasoningBody) return props.renderFactorySlot('conversation.chat.reasoning.content', owner)
+            // The shipped occupant of the images child is a thin adapter onto the same
+            // public Content Factory, so rendering that Factory directly keeps the
+            // native gallery (and any plugin that replaces the Factory).
+            if (name === imagesBody) {
+              const { images, loadImage, align, compact, thumbnail } = owner ?? {}
+              return props.renderFactorySlot('conversation.images.content', { images, loadImage, align, ...(compact === undefined ? {} : { compact }), ...(thumbnail === undefined ? {} : { thumbnail }) })
+            }
+            throw new Error('Unsupported native reasoning child')
+          }
+          return h(Native, { ...props, renderSlot })
+        }
+        let current, currentBody, base, wrapped, dispose, stopped = false
         const reconcile = () => {
           if (stopped) return
           const hasAll = typeof ctx.slots.entries === 'function'
@@ -239,15 +288,18 @@ export function createClient(React, protocol, runtime = window) {
             if (entries.some(e => e.options.key === key && e.component === wrapped)) return
             if (base && native && native.component !== base.component) { dispose?.(); dispose = undefined; current = native; return }
           }
-          if (native === current) return
-          dispose?.(); dispose = undefined; current = native
-          if (!native || native.children) return
-          wrapped = wrap(native.component)
+          const body = defaultReasoningBody(native)
+          if (native === current && body === currentBody) return
+          dispose?.(); dispose = undefined; current = native; currentBody = body
+          // Other child-owning renderers keep their complete native behavior.
+          if (!native || (native.children && !body)) return
+          wrapped = wrap(body ? withReasoningFactory(native.component) : native.component)
           dispose = ctx.slots.register({ name: slot, key, priority: (native.options.priority ?? 0) - 1, ...(native.locale ? { locale: native.locale } : {}), ...(native.inject ? { inject: native.inject } : {}), ...(native.store ? { store: native.store } : {}) }, wrapped)
         }
         const unsubscribe = ctx.slots.subscribe(slot, reconcile)
-        try { reconcile() } catch (error) { unsubscribe(); throw error }
-        return () => { stopped = true; unsubscribe(); dispose?.() }
+        const unsubscribeBody = key === 'assistant-step' ? ctx.slots.subscribe(reasoningBody, reconcile) : () => {}
+        try { reconcile() } catch (error) { unsubscribe(); unsubscribeBody(); throw error }
+        return () => { stopped = true; unsubscribe(); unsubscribeBody(); dispose?.() }
       })
       ctx.effect(() => () => { settings = {...settings,enabled:false}; listeners.forEach(fn => fn()); listeners.clear(); runtime.document.documentElement.style.removeProperty('--dsh-progress-font-size'); runtime.document.documentElement.removeAttribute('data-dsh-progress-enabled') })
     },

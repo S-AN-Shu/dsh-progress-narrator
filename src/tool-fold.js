@@ -5,6 +5,9 @@
 export function installToolFolding(document, host, getFoldedKeys, enabled) {
   const tracked = new Map(), manual = new Set()
   let stopped = false, scheduled = false
+  // Native Step groups exist even in verbose mode, when whole-Turn folding
+  // is off and data-turn-process-member is absent. They retain ownership.
+  const nativeOwnsRow = row => row.hasAttribute('data-turn-process-member') || Boolean(row.closest?.('[data-step-process]'))
   const restore = row => {
     const state = tracked.get(row)
     state?.button.remove(); row.removeAttribute('data-pn-tool-collapsed'); tracked.delete(row)
@@ -16,12 +19,12 @@ export function installToolFolding(document, host, getFoldedKeys, enabled) {
     const keys = getFoldedKeys()
     const active = enabled()
     for (const [row] of tracked) {
-      if (!active || !row.isConnected || !keys.has(row.dataset.chatFlowKey) || row.hasAttribute('data-turn-process-member')) restore(row)
+      if (!active || !row.isConnected || !keys.has(row.dataset.chatFlowKey) || nativeOwnsRow(row)) restore(row)
     }
     if (!active) return
     for (const row of scope.querySelectorAll('[data-chat-flow-kind="tool-call"]')) {
       const key = row.dataset.chatFlowKey
-      if (!keys.has(key) || row.hasAttribute('data-turn-process-member')) continue
+      if (!keys.has(key) || nativeOwnsRow(row)) continue
       let state = tracked.get(row)
       if (!state) {
         const button = document.createElement('button')

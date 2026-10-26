@@ -21,25 +21,43 @@ export function createSettingsUI(React, runtime, updateSettings) {
       return () => controller.abort()
     }, [reload])
     const change = (key, value) => setDraft(current => ({ ...current, [key]: value }))
+    const persist = async patch => {
+      const res = await runtime.fetch(endpoint, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patch, expectedRevision: data.revision }) })
+      if (!res.ok) throw new Error(res.status === 409 ? '设置已在其他页面更新，请重新读取后再保存。' : '保存失败，请检查数值范围或稍后重试。')
+      return res.json()
+    }
+    const setEnabled = async enabled => {
+      if (busy || !data?.writable) return
+      change('enabled', enabled); setBusy(true); setStatus('正在保存开关…')
+      try {
+        const value = await persist({ enabled })
+        setData(value)
+        // Saving the master switch must not submit or discard other edits.
+        setDraft(current => ({ ...current, enabled: value.config.enabled }))
+        updateSettings(value.config)
+        setStatus(value.config.enabled ? '已启用工作说明。' : '已关闭。后续请求不再注入新的播报规则。')
+      } catch (e) {
+        setDraft(current => ({ ...current, enabled: data.config.enabled }))
+        setStatus(e.message)
+      } finally { setBusy(false) }
+    }
     const save = async event => {
       event.preventDefault(); setBusy(true); setStatus('正在保存…')
       try {
         const patch = Object.fromEntries(Object.keys(draft).filter(k => draft[k] !== data.config[k]).map(k => [k, draft[k]]))
-        const res = await runtime.fetch(endpoint, { method: 'PATCH', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patch, expectedRevision: data.revision }) })
-        if (!res.ok) throw new Error(res.status === 409 ? '设置已在其他页面更新，请重新读取后再保存。' : '保存失败，请检查数值范围或稍后重试。')
-        const value = await res.json(); setData(value); setDraft(value.config); updateSettings(value.config)
+        const value = await persist(patch); setData(value); setDraft(value.config); updateSettings(value.config)
         setStatus('已保存。频率和风格从后续正常请求边界生效。')
       } catch (e) { setStatus(e.message) } finally { setBusy(false) }
     }
     const row = (label, input, help) => h('label', { className: 'dsh-pn-setting-row' }, h('span', null, label), input, help && h('small', null, help))
-    const toggle = (key, label, help) => row(label, h('input', { 'aria-label': label, type: 'checkbox', checked: draft[key], onChange: e => change(key, e.target.checked) }), help)
+    const toggle = (key, label, help) => row(label, h('input', { 'aria-label': label, type: 'checkbox', checked: draft[key], onChange: e => key === 'enabled' ? setEnabled(e.target.checked) : change(key, e.target.checked) }), help)
     const number = (key, label, min, max, unit = 1, help) => row(label, h('input', { 'aria-label': label, type: 'number', min, max, step: 1, required: true, value: draft[key] / unit, onChange: e => change(key, e.target.value === '' ? '' : Number(e.target.value) * unit) }), help)
     const select = (key, label, values) => row(label, h('select', { 'aria-label': label, value: draft[key], onChange: e => change(key, e.target.value) }, values.map(([value, text]) => h('option', { key: value, value }, text))))
     return h('section', { className: 'dsh-pn-settings', 'aria-label': '工作说明设置' },
       h('h2', null, h(BubbleIcon), '工作说明'),
       h('p', null, '简短说明正在做什么，保留最新思考和工具。'),
       draft && h('form', { onSubmit: save }, h('fieldset', { disabled: busy || !data.writable },
-        toggle('enabled', '启用工作说明'),
+        toggle('enabled', '启用工作说明', '开关立即保存；其他设置需点击“保存设置”。'),
         select('narrationStyle', '播报风格', [['first-person', '常规第一人称'], ['stages', '阶段进展报告'], ['cat', '猫娘模式'], ['custom', '自定义']]),
         draft.narrationStyle === 'custom' && row('自定义风格', h('textarea', { 'aria-label': '自定义风格', rows: 3, maxLength: 2000, value: draft.customStyle, onChange: e => change('customStyle', e.target.value), placeholder: '例如：语气平实，先说已确认的结果，再说下一步。' })),
         number('narrationIntervalMs', '无说明时长（秒）', 1, 3600, 1000),
@@ -47,7 +65,7 @@ export function createSettingsUI(React, runtime, updateSettings) {
         number('silentStepThreshold', '无说明模型步数', 1, 100),
         select('triggerMode', '提醒触发方式', [['either', '时长或步数达到任一项'], ['both', '时长和步数都达到'], ['time', '仅按时长'], ['steps', '仅按步数']]),
         number('minNudgeIntervalMs', '最短提醒间隔（秒）', 1, 3600, 1000, '首次提醒、两次提醒之间、已有工作说明之后，都遵守这个间隔。推荐 120 秒。'),
-        toggle('autoFoldHistory', '自动折叠历史思考和工具', '仅控制官方对话视图的显示。阅读视图及其他接管折叠的插件使用自己的设置；不压缩模型上下文。'),
+        toggle('autoFoldHistory', '旧版视图折叠兼容', '当前桌面端使用原生展示模式控制思考和工具折叠；此开关仅用于没有原生折叠接口的旧版视图。阅读视图使用自己的设置。'),
         h('details', null, h('summary', null, '更多设置'),
           toggle('backoffEnabled', '未回应提醒时自动放慢', '连续未回应后逐步放慢，最多为最短间隔的两倍；有工作说明后恢复。'),
           number('maxNudgesPerTurn', '每轮提醒上限', 0, 100, 1, '0 表示持续提醒，仍遵守间隔与退避。设为 2 等有限值会在用尽后停止提醒。'),

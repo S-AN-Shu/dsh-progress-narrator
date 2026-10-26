@@ -2,7 +2,7 @@
 
 一个适用于 DeepSeek Harness（DSH）0.2 的 Host + Web Client 插件，用简短、安静的工作说明让长任务保持可理解。它不会显示深度思维链，也不会控制工具执行。
 
-0.4.0 使用当前 DSH 的公开会话事件、动态配置引用和原生聊天插槽；兼容范围声明为 `>=0.2.0-rc.1 <0.3.0`，已验证的内核版本为 `0.2.0-rc.2`。插件旧版 0.2.2 的接线属于旧内核实现，不能用它的历史验收代替当前兼容验证。包名仍为 `dsh-progress-narrator`，bundle 条目仍为 `progress-narrator`。
+0.4.3 使用当前 DSH 的公开会话事件、动态配置引用和原生聊天插槽；兼容范围声明为 `>=0.2.0-rc.1 <0.3.0`。本轮在 rc.2 关闭与折叠修复基础上，适配 `0.2.1-alpha.2` 新增的 reasoning 子插槽，并通过两个版本真实原生组件的无界面浏览器检查。候选未替换正在运行的桌面安装，完整 Desktop 激活尚未验收。桌面应用版本和内核包版本需要分别核对；其他桌面发行版不能凭版本号推定兼容。包名仍为 `dsh-progress-narrator`，bundle 条目仍为 `progress-narrator`。
 
 ## 做什么
 
@@ -15,13 +15,15 @@
 - 检测到 better-display Reader 后让 Reader 独占过程折叠，避免两个插件同时操作同一段 DOM。
 - 设置页支持频率、步骤阈值、折叠、播报风格和自定义规则；配置通过 DSH settings 持久化并带 revision 冲突保护。
 
+“启用工作说明”开关立即保存；其他设置仍需点击“保存设置”。关闭后，后续正常请求不再新增播报规则或提醒。已经写入当前会话的历史规则会保留，模型可能继续按旧上下文输出说明；这不能作为仍有新注入的证据。插件不删除或改写历史会话。
+
 插件只观察公开会话事件和助手流，不创建额外模型请求、不执行工具、不伪造结果、不输出内部逐步推理。Host 状态路由使用 DSH Connection 的认证边界。
 
 ## 与 better-display 的关系
 
 better-display 是独立项目（上游 [aa2246740/dsh-better-display](https://github.com/aa2246740/dsh-better-display)，npm 包 `dsh-better-display`，MIT）。它的 Reader、样式和版本由上游维护。本仓库不发布 better-display，也不提供它的适配版安装包。
 
-本插件在官方“对话”页提供基础折叠和播报行展示。检测到 Reader 的 DOM 标记（`[data-dsh-better-display]`、`[data-reader-flow]`、`[data-reader-turn]`）后，会停止自己的折叠控制，让 Reader 管理过程区域。这个自动检测只解决折叠控制权，不代表 Reader 已支持播报协议。
+本插件在官方“对话”页提供播报行展示。当前桌面端已有原生展示模式，思考和工具折叠交给原生控制，尊重用户选择不折叠的模式；只有缺少原生折叠接口的旧版视图才使用备用折叠。检测到 Reader 的 DOM 标记（`[data-dsh-better-display]`、`[data-reader-flow]`、`[data-reader-turn]`）后，会停止自己的折叠控制，让 Reader 管理过程区域。这个自动检测只解决折叠控制权，不代表 Reader 已支持播报协议。
 
 ### 安装 better-display 后，播报被折叠或出现图钉怎么办？
 
@@ -57,9 +59,11 @@ Reader 侧适配基于独立分支 [S-AN-Shu/dsh-better-display · reader-narrat
 
 ## 安装
 
-`0.4.0` 本轮通过源码仓库 `main` 同步及本地构建包交付；未自动发布到 npm。Desktop“插件 → 添加插件”可使用 `github:S-AN-Shu/dsh-progress-narrator` 或本地0.4.0包；Web CLI 使用 `dsh plugin --profile web add github:S-AN-Shu/dsh-progress-narrator`。下面npm0.3.0示例属于已发布旧版，不含此次融合修复。
+`0.4.3` 是本仓库当前的最新版本，含 `0.2.1-rc.3` 的两处兼容修复（新增图片子插槽、压缩运行时 registrant 短 id）。安装可用本仓库目录、`npm pack` 产物或 `dsh-progress-narrator-0.4.3.tgz`；`0.4.2` 及更早的候选包不含这些修复。下面 npm 0.3.0 示例属于已发布旧版，同样不含。
 
 本仓库既是外部插件的源码仓库，也是一个标准的 DSH bundle：根目录的 `cordis.patch.yml` 由 manifest 里的 `dsh.bundle.patch` 声明，所以 `dsh plugin add` 安装后它会作为一层 profile 层生效。可使用发布的精确版本、提供的 `.tgz` 文件，或本地源码目录；不要把不同版本同时挂载在同一 profile。
+
+**Desktop 与 Web CLI 的区别**：Desktop 版在「插件 → 添加插件」里填 `github:S-AN-Shu/dsh-progress-narrator`（或指向本地 `.tgz`）；Web CLI 用 `dsh plugin --profile web add github:S-AN-Shu/dsh-progress-narrator`。两条路径装的是同一份 bundle，只装其中一次即可。
 
 **按 bundle 安装（推荐）**
 
@@ -124,11 +128,15 @@ npm pack --dry-run
 | `narrationIntervalMs` | `120000` | 无播报时间阈值 |
 | `minNudgeIntervalMs` | `120000` | 已接纳提醒的最短间隔 |
 | `maxNudgesPerTurn` | `0` | 每轮提醒上限；`0` 表示不设硬上限 |
-| `autoFoldHistory` | `true` | 仅控制官方视图的基础折叠；Reader 会独立管理 |
+| `autoFoldHistory` | `true` | 仅控制旧版视图备用折叠；当前桌面原生模式与 Reader 独立管理 |
 | `triggerMode` | `either` | 按时间或步骤任一项触发 |
 | `narrationStyle` | `first-person` | 第一人称、阶段式、猫娘或自定义 |
 
 ## 验证范围
+
+0.4.3 隔离候选通过 74 项插件测试及客户端构建；真实无头浏览器加载官方界面后，被接管节点 129 个、淡灰播报行 14 条、段首裸 `📌` 段落 0 条。真实无界面浏览器使用官方 rc.2 的 SettingsForms、ConfigEditor、Loader 和动态 Config，覆盖总开关立即保存、其他草稿保留、刷新、写入失败与 revision 冲突回滚、异步接纳期间停用、重新启用、历史规则保留和独立 Host 重启持久化。rc.2 原生组件回归覆盖 standard/compact/verbose 模式、源顺序、展开收起、停用恢复，以及没有 Turn 的历史工具行。
+
+alpha.2 浏览器夹具使用官方源码的 SlotCore、聊天节点注册器、AssistantNodeView 和 ReasoningContent，通过真实 React DOM 检查子插槽声明保留、公开正文与播报源顺序、原生思考展开、停用，以及第三方 Body 接管和撤销。组件函数名压缩也有回归测试。上述验证未操作正在使用的桌面端，不包括完整 Desktop 激活、真实鉴权、模型调用、完整 UI 动画或部署后的整机验收。
 
 0.3.0 候选在 DSH `0.2.0-rc.2` 的实际依赖上通过 52 项插件测试，以及构建、语法和发布包检查。额外的 4 项隔离契约验证使用当前 Cordis、Session v4、SettingsForms、SlotCore 和官方聊天图投影，覆盖请求接纳、配置 revision 冲突、动态引用更新、原生折叠后的工作说明保留及卸载清理。设置持久化适配器和 React 渲染在这些隔离验证中替换为测试夹具；它们不等同于真实浏览器交互、profile 文件写入或模型执行验收。
 

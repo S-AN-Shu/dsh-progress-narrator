@@ -78,3 +78,38 @@ test('disabled plugin has no state or injection', async () => {
   const response = await f.routes.get('/api/progress-narrator/state').fetch(new Request('http://test/api/progress-narrator/state?session=s'))
   assert.equal((await response.json()).session, null)
 })
+
+test('a live disable while admission awaits next prevents injection without a settings notification', async () => {
+  let live = { enabled: true }
+  const f = fixture({ get: () => live })
+  let admit
+  const decision = { kind: 'enter', messages: [{ id: 'human' }], startsRequestSeries: true }
+  const pending = f.handlers.get('agent/pre-step')({ agent: f.agent, turn: 1, step: 1, messages: [], signal: f.controller.signal },
+    () => new Promise(resolve => { admit = resolve }))
+  live = { enabled: false }
+  admit(decision)
+  assert.deepEqual(await pending, decision)
+  live = { enabled: true }
+  assert.equal((await f.step()).messages.at(-1).source.control, 'teach')
+})
+
+test('state and settings reads reflect a live reference even before an update notification', async () => {
+  let live = { enabled: true }
+  const f = fixture({ get: () => live })
+  live = { enabled: false }
+  const state = await f.routes.get('/api/progress-narrator/state').fetch(new Request('http://test/api/progress-narrator/state?session=s'))
+  const stateBody = await state.json()
+  assert.equal(stateBody.config.enabled, false)
+  assert.equal(stateBody.session, null)
+  const settings = await f.routes.get('/api/progress-narrator/settings').fetch(new Request('http://test/api/progress-narrator/settings'))
+  assert.equal((await settings.json()).config.enabled, false)
+})
+
+test('disabling leaves existing controls in history and adds no new control', async () => {
+  const f = fixture({ enabled: false })
+  f.history.push({ id: 'historical-teach', role: 'user', content: [{ type: 'text', text: 'Earlier narration rules.' }], source: { kind: 'progress-narrator', control: 'teach' } })
+  const before = JSON.stringify(f.history)
+  const decision = { kind: 'enter', messages: [{ id: 'new-human' }] }
+  assert.deepEqual(await f.step({}, decision), decision)
+  assert.equal(JSON.stringify(f.history), before)
+})
